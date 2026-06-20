@@ -1,5 +1,7 @@
 # Hulbert General Store (헐버트잡화점)
 
+> 🗂 **Scope note**: This is a foreign-visitor / English asset — **outside the current scope of '헐버트작가촌' (the artist-only recruitment site).** Kept for future use if a customer/foreigner-facing page is needed.
+
 > A single **hanok** (traditional Korean house) in **Seochon**, the old artists' neighborhood beside **Gyeongbokgung Palace** in Seoul.
 > Here, every handmade piece is the work of an independent Korean artist — and buying one supports that artist's dream directly.
 
