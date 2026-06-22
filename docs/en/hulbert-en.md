@@ -46,7 +46,7 @@ Each piece carries the **dream-name (꿈을 담은 한글 이름, *kkum-eul dame
 
 # For Artists
 
-If you make things by hand and want your work to reach customers — including the foreign visitors who fill this street — here is how working with us actually works. (We're a Korea-based shop; our day-to-day documents are in Korean, but the model is the same for everyone.)
+This section explains, for visitors curious about how the shop works, the deal we offer the **Korean artists** who sell here — so their handmade work can reach the customers, including the foreign visitors, who fill this street. (We're a Korea-based shop and recruit artists in Korean; the day-to-day documents are Korean, but here is the model in plain English.)
 
 ## The model, plainly
 
@@ -85,19 +85,19 @@ We work as **peers, together (함께)** — never serving, always alongside one 
 
 > **Create without fear of loss.** Sell well, and we reward you with the welfare fee — and in the end, we become owners together. We're not here to sign you up as a tenant; we're looking for colleagues who will own this place with us.
 
-## Apply / reach us
+## How artists join
 
-Applying is simple. Send us just three things:
+Joining is simple. An artist sends just three things:
 
-1. A few **photos** of your work
+1. A few **photos** of their work
 2. **"What is your dream?"** — in one sentence
-3. The **dream-name (Korean name)** you'd like to be called by — and if you don't have one, we'll make one together
+3. The **dream-name (Korean name)** they'd like to be called by — and if they don't have one, we make one together
 
 - **Apply via:** online form or DM _(channel opening soon — placeholder)_
 - **Location:** Seochon, Seoul, beside Gyeongbokgung _(full address TBD)_
 - **Contact:** _TBD_
 
-> We never ask your age or your schooling. The first thing we ask is only this — **"What is your dream?"**
+> We never ask an artist's age or schooling. The first thing we ask is only this — **"What is your dream?"**
 
 ---
 
