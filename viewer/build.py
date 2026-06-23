@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""헐버트 프로젝트 문서 → 단일 HTML 뷰어 빌드 (외부 의존성 없음)."""
-import re, os, html as htmllib
+"""헐버트 프로젝트 문서 → 단일 HTML 뷰어+에디터 빌드 (읽기=의존성 없음, 편집 미리보기=marked CDN)."""
+import re, os, json, html as htmllib
 import markdown
 
 # 저장소 루트 = 이 스크립트(viewer/build.py)의 상위 폴더
@@ -49,7 +49,6 @@ STATUS_ORDER = [
 ]
 
 def gh_slug(text, sep="-"):
-    """GitHub식 앵커 슬러그(유니코드/한글 보존)."""
     s = htmllib.unescape(text).strip().lower()
     s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE)
     s = re.sub(r"\s", sep, s.strip())
@@ -67,8 +66,7 @@ def parse_meta(md_text):
     title, badge, role = "(제목 없음)", "", ""
     for line in md_text.splitlines():
         if line.startswith("# "):
-            title = line[2:].strip()
-            break
+            title = line[2:].strip(); break
     m = re.search(r"🏷️\s*\*\*(.+?)\*\*(.*)", md_text)
     if m:
         badge = m.group(1).strip()
@@ -101,20 +99,18 @@ def prefix_anchors(s, n):
     s = re.sub(r'href="#([^"]+)"',  lambda m: f'href="#d{n}-{m.group(1)}"', s)
     return s
 
-articles, navmeta = [], []
+articles, navmeta, raw_sources = [], [], []
 for i, (rel, gkey, glabel) in enumerate(DOCS):
-    p = os.path.join(ROOT, rel)
-    with open(p, encoding="utf-8") as f:
+    with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
         md_text = f.read()
+    raw_sources.append(md_text)
     title, badge, role = parse_meta(md_text)
     skey = status_key(badge) if badge else "info"
     md = markdown.Markdown(
         extensions=["extra", "toc", "sane_lists", "attr_list"],
         extension_configs={"toc": {"slugify": gh_slug, "separator": "-"}},
     )
-    body = md.convert(md_text)
-    body = rewrite_md_links(body)
-    body = prefix_anchors(body, i)
+    body = prefix_anchors(rewrite_md_links(md.convert(md_text)), i)
     articles.append(
         f'<article class="doc" id="doc-{i}" data-group="{gkey}" data-status="{skey}" hidden>\n{body}\n</article>'
     )
@@ -126,8 +122,7 @@ glabel_map = dict(GROUP_ORDER)
 nav_html = []
 for gkey, _ in GROUP_ORDER:
     members = [m for m in navmeta if m["group"] == gkey]
-    if not members:
-        continue
+    if not members: continue
     nav_html.append(f'<div class="nav-group" data-group="{gkey}">')
     nav_html.append(f'<div class="nav-grouphead">{htmllib.escape(glabel_map[gkey])}</div>')
     for m in members:
@@ -151,6 +146,11 @@ status_pills = "".join(
     for k, lbl in STATUS_ORDER
 )
 
+# 편집용 원본/경로/링크맵 임베드 (</ 이스케이프로 스크립트 조기 종료 방지)
+raw_json  = json.dumps({str(i): s for i, s in enumerate(raw_sources)}, ensure_ascii=False).replace("</", "<\\/")
+relp_json = json.dumps({str(i): rel for i, (rel, _g, _gl) in enumerate(DOCS)}, ensure_ascii=False)
+base_json = json.dumps(basemap, ensure_ascii=False)
+
 CSS = """
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 :root{
@@ -165,10 +165,9 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--paper);color:var(--ink);
   font-family:"Pretendard Variable","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-
 .layout{display:flex;align-items:flex-start;min-height:100vh}
 
-/* ---------- 사이드바 ---------- */
+/* 사이드바 */
 .sidebar{width:var(--sidebar-w);flex:0 0 var(--sidebar-w);background:var(--sidebar);
   border-right:1px solid var(--line);height:100vh;position:sticky;top:0;
   display:flex;flex-direction:column;z-index:40}
@@ -192,7 +191,6 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .pill.st.s-later.active{background:var(--c-later);border-color:var(--c-later);color:#fff}
 .pill.st.s-out.active{background:var(--c-out);border-color:var(--c-out);color:#fff}
 .count{font-size:.7rem;color:var(--muted);margin:9px 2px 2px}
-
 .side-nav{flex:1;overflow-y:auto;padding:10px 10px 40px}
 .nav-group{margin:2px 0 10px}
 .nav-grouphead{font-size:.66rem;font-weight:800;letter-spacing:.09em;color:var(--muted);
@@ -204,6 +202,7 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .navitem.active{background:var(--accent);color:#fff}
 .navitem.active .navitem-sub{color:rgba(255,255,255,.82)}
 .navitem.active .dot{box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+.navitem.edited .navitem-title::after{content:" ✏️";font-size:.82em}
 .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
 .s-confirmed .dot{background:var(--c-confirmed)} .s-draft .dot{background:var(--c-draft)}
 .s-review .dot{background:var(--c-review)} .s-later .dot{background:var(--c-later)}
@@ -213,14 +212,24 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .navitem-sub{font-size:.67rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .empty{color:var(--muted);font-size:.8rem;padding:20px 12px;text-align:center}
 
-/* ---------- 본문 + 목차 ---------- */
+/* 본문 + 목차 */
 .content{flex:1;min-width:0;display:flex;justify-content:center;gap:46px;padding:0 36px}
-.reader{flex:1 1 var(--reader-w);max-width:var(--reader-w);padding:54px 0 140px;
-  font-size:17px;line-height:1.78}
+.reader{flex:1 1 var(--reader-w);max-width:var(--reader-w);padding:22px 0 140px;font-size:17px;line-height:1.78}
+.reader-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin:0 0 20px;padding:10px 0 14px;border-bottom:1px solid var(--line-soft)}
+.bar-path{font-size:.72rem;color:var(--muted);font-family:"SFMono-Regular",Consolas,monospace}
+.tag-edited{font-size:.7rem;color:var(--c-review);font-weight:700}
+.reader-bar .sp{flex:1}
+.tbtn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;
+  padding:6px 12px;font-size:.8rem;cursor:pointer;font-family:inherit;transition:.12s;white-space:nowrap}
+.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+.tbtn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tbtn.primary:hover{color:#fff;filter:brightness(1.06)}
+.tbtn.hot{color:var(--c-review);border-color:#e6cfa3}
 .doc{animation:fade .22s ease}
 @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
-.doc :where(h1,h2,h3,h4){scroll-margin-top:74px}
-.doc h1{font-size:1.92rem;line-height:1.25;margin:0 0 .55em;letter-spacing:-.022em;font-weight:800}
+.doc :where(h1,h2,h3,h4){scroll-margin-top:24px}
+.doc h1{font-size:1.92rem;line-height:1.25;margin:.1em 0 .55em;letter-spacing:-.022em;font-weight:800}
 .doc h2{font-size:1.36rem;margin:2.05em 0 .65em;padding-bottom:.32em;
   border-bottom:1.5px solid var(--line);font-weight:700;letter-spacing:-.01em}
 .doc h3{font-size:1.13rem;margin:1.7em 0 .5em;font-weight:700;color:#39332b}
@@ -233,7 +242,6 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .doc blockquote{margin:1.05em 0;padding:.8em 1.15em;background:#faf5ec;
   border-left:4px solid var(--accent);border-radius:0 9px 9px 0;color:#4a4239}
 .doc blockquote p{margin:.3em 0}
-.doc blockquote:first-child{background:var(--accent-soft);border-left-color:var(--accent);font-size:.96em}
 .doc ul,.doc ol{padding-left:1.45em;margin:.7em 0}
 .doc li{margin:.34em 0}
 .doc li::marker{color:var(--accent)}
@@ -247,9 +255,8 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .doc tr:nth-child(even) td{background:#fbf7ef}
 .doc hr{border:none;border-top:1px solid var(--line-soft);margin:2em 0}
 .doc img{max-width:100%}
-
 .toc{flex:0 0 var(--toc-w);width:var(--toc-w);position:sticky;top:0;align-self:flex-start;
-  max-height:100vh;overflow-y:auto;padding:60px 0 60px;font-size:.78rem}
+  max-height:100vh;overflow-y:auto;padding:28px 0 60px;font-size:.78rem}
 .toc-head{font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;
   font-size:.64rem;margin:0 0 9px 12px}
 .toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 12px;
@@ -258,12 +265,32 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .toc a.lvl3{padding-left:24px;font-size:.74rem}
 .toc a.active{color:var(--accent);border-left-color:var(--accent);font-weight:700}
 
-/* ---------- 모바일 ---------- */
+/* 편집 모드 */
+.editor{display:none;gap:22px}
+body.editing .editor{display:flex}
+body.editing article.doc{display:none}
+body.editing .reader{max-width:1200px}
+body.editing .toc{display:none}
+.ed-src{flex:1 1 50%;min-width:0;min-height:72vh;border:1px solid var(--line);border-radius:10px;
+  padding:16px;font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  font-size:13.5px;line-height:1.62;background:#fffdf9;color:var(--ink);resize:vertical;tab-size:2}
+.ed-src:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ed-prevwrap{flex:1 1 50%;min-width:0;display:flex;flex-direction:column}
+.ed-prevhint{font-size:.66rem;color:var(--muted);margin:0 0 6px 2px}
+.ed-prev{overflow:auto;border:1px solid var(--line-soft);border-radius:10px;
+  padding:6px 22px 18px;background:var(--card);min-height:72vh}
+.noprev{color:var(--muted);padding:40px 20px;text-align:center;line-height:1.7}
+
+/* 모바일 */
 .menu-toggle{display:none;position:fixed;top:12px;left:12px;z-index:60;
   background:var(--ink);color:#fff;border:none;border-radius:9px;padding:9px 13px;
   font-size:.85rem;font-family:inherit;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.22)}
 .scrim{display:none;position:fixed;inset:0;background:rgba(30,24,18,.42);z-index:35}
 .scrim.show{display:block}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
+  background:var(--ink);color:#fff;padding:9px 16px;border-radius:9px;font-size:.82rem;
+  opacity:0;pointer-events:none;transition:.2s;z-index:80}
+.toast.show{opacity:.96;transform:translateX(-50%)}
 @media(max-width:1140px){ .toc{display:none} }
 @media(max-width:860px){
   .menu-toggle{display:block}
@@ -271,14 +298,20 @@ body{margin:0;background:var(--paper);color:var(--ink);
     transition:transform .25s ease;box-shadow:6px 0 24px rgba(40,28,18,.18)}
   .sidebar.open{transform:none}
   .content{padding:0 18px}
-  .reader{padding:64px 0 90px;font-size:16.5px}
-  .doc h1{font-size:1.62rem}
-  .doc h2{font-size:1.24rem}
+  .reader{padding:60px 0 90px;font-size:16.5px}
+  .reader-bar{padding-top:4px}
+  .doc h1{font-size:1.62rem}.doc h2{font-size:1.24rem}
+  .editor{flex-direction:column}
+  .ed-src,.ed-prev{min-height:46vh}
 }
 """
 
 JS = """
-const articles=Array.from(document.querySelectorAll('.doc'));
+const RAW =JSON.parse(document.getElementById('rawdata').textContent);
+const RELP=JSON.parse(document.getElementById('relpaths').textContent);
+const BASE=JSON.parse(document.getElementById('basemap').textContent);
+const articles=Array.from(document.querySelectorAll('article.doc'));
+const ORIG=articles.map(a=>a.innerHTML);
 const items=Array.from(document.querySelectorAll('.navitem'));
 const groups=Array.from(document.querySelectorAll('.nav-group'));
 const stPills=Array.from(document.querySelectorAll('.pill.st'));
@@ -288,8 +321,34 @@ const emptyEl=document.getElementById('empty');
 const tocEl=document.getElementById('toc');
 const sidebar=document.getElementById('sidebar');
 const scrim=document.getElementById('scrim');
+const bar=document.getElementById('readerbar');
+const editor=document.getElementById('editor');
+const edsrc=document.getElementById('edsrc');
+const edprev=document.getElementById('edprev');
 const total=items.length;
-let curStatus='all', curQuery='', curHeads=[], tocLinks=[];
+let curStatus='all',curQuery='',curHeads=[],tocLinks=[],curDoc=0,editing=false;
+
+const EKEY=i=>'hbedit:'+RELP[i];
+const getSrc=i=>{const v=localStorage.getItem(EKEY(i));return v!==null?v:RAW[i];};
+const isEdited=i=>{const v=localStorage.getItem(EKEY(i));return v!==null&&v!==RAW[i];};
+function editedList(){const r=[];for(let k=0;k<total;k++)if(isEdited(k))r.push(k);return r;}
+function slug(t){return t.trim().toLowerCase().replace(/[^\\w\\s-]/g,'').replace(/\\s+/g,'-');}
+
+function renderMD(src,i){
+  if(!window.marked) return '<div class="noprev">미리보기 모듈(marked)을 불러오지 못했어요 — 네트워크 차단 등.<br>소스 편집과 <b>.md 저장</b>은 정상 작동합니다.</div>';
+  const div=document.createElement('div');
+  div.innerHTML=window.marked.parse(src);
+  div.querySelectorAll('h1,h2,h3,h4').forEach(h=>{if(!h.id)h.id='d'+i+'-'+slug(h.textContent);});
+  div.querySelectorAll('a[href]').forEach(a=>{
+    const base=(a.getAttribute('href')||'').split('#')[0].split('/').pop().replace(/\\.md$/,'');
+    if(Object.prototype.hasOwnProperty.call(BASE,base)){a.setAttribute('href','#');a.setAttribute('data-goto',BASE[base]);}
+  });
+  return div.innerHTML;
+}
+function renderReadDoc(i){
+  const art=document.getElementById('doc-'+i);
+  art.innerHTML=(isEdited(i)&&window.marked)?renderMD(getSrc(i),i):ORIG[i];
+}
 
 function applyFilter(){
   let shown=0;
@@ -298,63 +357,107 @@ function applyFilter(){
     g.querySelectorAll('.navitem').forEach(c=>{
       const okS=curStatus==='all'||c.dataset.status===curStatus;
       const okQ=!curQuery||(c.dataset.title+' '+c.dataset.role).toLowerCase().includes(curQuery);
-      const vis=okS&&okQ; c.style.display=vis?'':'none'; if(vis){gv++;shown++;}
+      const vis=okS&&okQ;c.style.display=vis?'':'none';if(vis){gv++;shown++;}
     });
     g.style.display=gv?'':'none';
   });
   countEl.textContent=shown+' / '+total+' 문서';
   emptyEl.style.display=shown?'none':'block';
 }
-
 function buildTOC(art){
   curHeads=Array.from(art.querySelectorAll('h2, h3'));
-  if(curHeads.length<2){ tocEl.innerHTML=''; tocLinks=[]; return; }
+  if(curHeads.length<2){tocEl.innerHTML='';tocLinks=[];return;}
   let h='<div class="toc-head">목차</div>';
-  curHeads.forEach(x=>{
-    const cls=x.tagName==='H3'?'lvl3':'lvl2';
-    h+='<a class="'+cls+'" href="#'+x.id+'">'+x.textContent+'</a>';
-  });
-  tocEl.innerHTML=h;
-  tocLinks=Array.from(tocEl.querySelectorAll('a'));
+  curHeads.forEach(x=>{h+='<a class="'+(x.tagName==='H3'?'lvl3':'lvl2')+'" href="#'+x.id+'">'+x.textContent+'</a>';});
+  tocEl.innerHTML=h;tocLinks=Array.from(tocEl.querySelectorAll('a'));
+}
+function spy(){
+  if(!tocLinks.length)return;let idx=0;
+  for(let k=0;k<curHeads.length;k++){if(curHeads[k].getBoundingClientRect().top<=150)idx=k;else break;}
+  tocLinks.forEach((a,k)=>a.classList.toggle('active',k===idx));
+}
+function markSidebar(){items.forEach(c=>c.classList.toggle('edited',isEdited(+c.dataset.i)));}
+
+function updateBar(){
+  const i=curDoc,ed=isEdited(i),nE=editedList().length;
+  let h='<span class="bar-path">'+RELP[i]+'</span>';
+  if(ed)h+=' <span class="tag-edited">● 편집됨</span>';
+  h+='<span class="sp"></span>';
+  if(!editing){
+    h+='<button class="tbtn primary" data-act="edit">✏️ 편집</button>';
+  }else{
+    h+='<button class="tbtn primary" data-act="read">✓ 읽기로</button>';
+    h+='<button class="tbtn" data-act="save">💾 .md 저장</button>';
+    h+='<button class="tbtn" data-act="copy">📋 복사</button>';
+    if(ed)h+='<button class="tbtn hot" data-act="revert">↩︎ 원본</button>';
+  }
+  if(nE>0)h+='<button class="tbtn" data-act="saveall">📦 변경분 '+nE+'개</button>';
+  bar.innerHTML=h;
 }
 
-function spy(){
-  if(!tocLinks.length) return;
-  let idx=0;
-  for(let k=0;k<curHeads.length;k++){
-    if(curHeads[k].getBoundingClientRect().top<=150) idx=k; else break;
-  }
-  tocLinks.forEach((a,k)=>a.classList.toggle('active',k===idx));
+function enterEdit(){editing=true;document.body.classList.add('editing');
+  edsrc.value=getSrc(curDoc);edprev.innerHTML=renderMD(edsrc.value,curDoc);updateBar();window.scrollTo({top:0});edsrc.focus();}
+function exitEdit(){editing=false;document.body.classList.remove('editing');
+  renderReadDoc(curDoc);markSidebar();buildTOC(document.getElementById('doc-'+curDoc));updateBar();
+  window.scrollTo({top:0});requestAnimationFrame(spy);}
+
+let dt;
+edsrc.addEventListener('input',()=>{
+  const val=edsrc.value;
+  if(val===RAW[curDoc])localStorage.removeItem(EKEY(curDoc));else localStorage.setItem(EKEY(curDoc),val);
+  clearTimeout(dt);dt=setTimeout(()=>{edprev.innerHTML=renderMD(val,curDoc);markSidebar();updateBar();},170);
+});
+// 탭 입력 지원
+edsrc.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();
+  const s=edsrc.selectionStart,en=edsrc.selectionEnd;edsrc.value=edsrc.value.slice(0,s)+'  '+edsrc.value.slice(en);
+  edsrc.selectionStart=edsrc.selectionEnd=s+2;edsrc.dispatchEvent(new Event('input'));}});
+
+function downloadDoc(i){
+  const blob=new Blob([getSrc(i)],{type:'text/markdown;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=RELP[i].split('/').pop();document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function copyDoc(i){
+  const t=getSrc(i);
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>toast('마크다운을 클립보드에 복사했어요')).catch(()=>toast('복사 실패 — 소스를 직접 선택해 주세요'));}
+  else{edsrc.select();document.execCommand&&document.execCommand('copy');toast('복사했어요');}
+}
+function revertDoc(i){
+  if(!confirm('이 문서의 로컬 편집을 모두 버리고 원본으로 되돌릴까요?'))return;
+  localStorage.removeItem(EKEY(i));
+  if(editing&&i===curDoc){edsrc.value=RAW[i];edprev.innerHTML=renderMD(RAW[i],i);}
+  renderReadDoc(i);markSidebar();updateBar();toast('원본으로 되돌렸어요');
 }
 
 function selectDoc(i){
+  curDoc=+i;
   articles.forEach(d=>d.hidden=(d.id!=='doc-'+i));
   items.forEach(c=>c.classList.toggle('active',c.dataset.i===String(i)));
-  const art=document.getElementById('doc-'+i);
-  buildTOC(art);
-  window.scrollTo({top:0,behavior:'auto'});
   closeSidebar();
-  requestAnimationFrame(spy);
+  if(editing){edsrc.value=getSrc(i);edprev.innerHTML=renderMD(edsrc.value,i);updateBar();window.scrollTo({top:0});return;}
+  renderReadDoc(i);
+  buildTOC(document.getElementById('doc-'+i));
+  updateBar();window.scrollTo({top:0,behavior:'auto'});requestAnimationFrame(spy);
 }
 
-function openSidebar(){ sidebar.classList.add('open'); scrim.classList.add('show'); }
-function closeSidebar(){ sidebar.classList.remove('open'); scrim.classList.remove('show'); }
+function openSidebar(){sidebar.classList.add('open');scrim.classList.add('show');}
+function closeSidebar(){sidebar.classList.remove('open');scrim.classList.remove('show');}
+let tt;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),1900);}
 
 items.forEach(c=>c.addEventListener('click',()=>selectDoc(c.dataset.i)));
-stPills.forEach(p=>p.addEventListener('click',()=>{
-  curStatus=p.dataset.st; stPills.forEach(x=>x.classList.toggle('active',x===p)); applyFilter();
-}));
-search.addEventListener('input',()=>{ curQuery=search.value.trim().toLowerCase(); applyFilter(); });
-document.addEventListener('click',e=>{
-  const a=e.target.closest('a[data-goto]');
-  if(a){ e.preventDefault(); selectDoc(a.dataset.goto); }
-});
+stPills.forEach(p=>p.addEventListener('click',()=>{curStatus=p.dataset.st;stPills.forEach(x=>x.classList.toggle('active',x===p));applyFilter();}));
+search.addEventListener('input',()=>{curQuery=search.value.trim().toLowerCase();applyFilter();});
+bar.addEventListener('click',e=>{const b=e.target.closest('button[data-act]');if(!b)return;const a=b.dataset.act;
+  if(a==='edit')enterEdit();else if(a==='read')exitEdit();else if(a==='save')downloadDoc(curDoc);
+  else if(a==='copy')copyDoc(curDoc);else if(a==='revert')revertDoc(curDoc);
+  else if(a==='saveall'){const L=editedList();if(!L.length){toast('변경된 문서가 없어요');return;}L.forEach((x,k)=>setTimeout(()=>downloadDoc(x),k*250));toast(L.length+'개 문서를 내려받아요');}});
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-goto]');if(a){e.preventDefault();selectDoc(a.dataset.goto);}});
 document.getElementById('menu').addEventListener('click',openSidebar);
 scrim.addEventListener('click',closeSidebar);
 window.addEventListener('scroll',spy,{passive:true});
 
-applyFilter();
-selectDoc(0);
+markSidebar();applyFilter();selectDoc(0);
 """
 
 HTML = f"""<!DOCTYPE html>
@@ -387,11 +490,25 @@ HTML = f"""<!DOCTYPE html>
 
   <div class="content">
     <main class="reader" id="reader">
+      <div class="reader-bar" id="readerbar"></div>
+      <div class="editor" id="editor">
+        <textarea class="ed-src" id="edsrc" spellcheck="false"></textarea>
+        <div class="ed-prevwrap">
+          <p class="ed-prevhint">미리보기 (실제 배포본은 커밋 후 다시 빌드됩니다)</p>
+          <div class="ed-prev doc" id="edprev"></div>
+        </div>
+      </div>
       {"".join(articles)}
     </main>
     <aside class="toc" id="toc"></aside>
   </div>
 </div>
+<div class="toast" id="toast"></div>
+
+<script type="application/json" id="rawdata">{raw_json}</script>
+<script type="application/json" id="relpaths">{relp_json}</script>
+<script type="application/json" id="basemap">{base_json}</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 <script>{JS}</script>
 </body>
 </html>
