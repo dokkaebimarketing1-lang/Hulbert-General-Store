@@ -109,9 +109,12 @@ for i, (rel, gkey, glabel) in enumerate(DOCS):
     )
     body = prefix_anchors(rewrite_md_links(md.convert(md_text)), i)
     # 생성된 이해용 일러스트가 있으면 문서 상단에 주입(원본 .md는 건드리지 않음)
+    # PNG(AI 생성) 우선, 없으면 SVG(기본 일러스트)
     slug = os.path.basename(rel)[:-3] if rel.endswith(".md") else os.path.basename(rel)
-    if os.path.exists(os.path.join(ROOT, "viewer", "assets", slug + ".png")):
-        body = f'<img class="doc-hero" src="assets/{slug}.png" alt="" loading="lazy">\n' + body
+    for ext in ("png", "svg"):
+        if os.path.exists(os.path.join(ROOT, "viewer", "assets", slug + "." + ext)):
+            body = f'<img class="doc-hero" src="assets/{slug}.{ext}" alt="" loading="lazy">\n' + body
+            break
     articles.append(
         f'<article class="doc" id="doc-{i}" data-group="{gkey}" data-status="{skey}" hidden>\n{body}\n</article>'
     )
