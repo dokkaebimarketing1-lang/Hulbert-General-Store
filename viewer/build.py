@@ -108,6 +108,10 @@ for i, (rel, gkey, glabel) in enumerate(DOCS):
         extension_configs={"toc": {"slugify": gh_slug, "separator": "-"}},
     )
     body = prefix_anchors(rewrite_md_links(md.convert(md_text)), i)
+    # 생성된 이해용 일러스트가 있으면 문서 상단에 주입(원본 .md는 건드리지 않음)
+    slug = os.path.basename(rel)[:-3] if rel.endswith(".md") else os.path.basename(rel)
+    if os.path.exists(os.path.join(ROOT, "viewer", "assets", slug + ".png")):
+        body = f'<img class="doc-hero" src="assets/{slug}.png" alt="" loading="lazy">\n' + body
     articles.append(
         f'<article class="doc" id="doc-{i}" data-group="{gkey}" data-status="{skey}" hidden>\n{body}\n</article>'
     )
@@ -267,6 +271,8 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .doc tr:nth-child(even) td{background:#fbf7ef}
 .doc hr{border:none;border-top:1px solid var(--line-soft);margin:2em 0}
 .doc img{max-width:100%}
+.doc-hero{width:100%;aspect-ratio:16/7;object-fit:cover;border-radius:14px;display:block;
+  margin:0 0 26px;box-shadow:0 6px 22px rgba(60,40,20,.10);background:var(--line-soft)}
 .toc{flex:0 0 var(--toc-w);width:var(--toc-w);position:sticky;top:0;align-self:flex-start;
   max-height:100vh;overflow-y:auto;padding:28px 0 60px;font-size:.78rem}
 .toc-head{font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;
