@@ -20,7 +20,6 @@ body{margin:0;background:var(--paper);color:var(--ink);
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 .layout{display:flex;align-items:flex-start;min-height:100vh}
 
-/* 사이드바 */
 .sidebar{width:var(--sidebar-w);flex:0 0 var(--sidebar-w);background:var(--sidebar);
   border-right:1px solid var(--line);height:100vh;position:sticky;top:0;
   display:flex;flex-direction:column;z-index:40}
@@ -65,11 +64,11 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .navitem-sub{font-size:.67rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .empty{color:var(--muted);font-size:.8rem;padding:20px 12px;text-align:center}
 
-/* 본문 + 목차 */
 .content{flex:1;min-width:0;display:flex;justify-content:center;gap:46px;padding:0 36px}
 .reader{flex:1 1 var(--reader-w);max-width:var(--reader-w);padding:22px 0 140px;font-size:17px;line-height:1.78}
-.reader-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  margin:0 0 20px;padding:10px 0 14px;border-bottom:1px solid var(--line-soft)}
+.reader-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:8;
+  background:linear-gradient(var(--paper) 78%,transparent);margin:0 0 16px;padding:12px 0 12px;
+  border-bottom:1px solid var(--line-soft)}
 .bar-path{font-size:.72rem;color:var(--muted);font-family:"SFMono-Regular",Consolas,monospace}
 .tag-edited{font-size:.7rem;color:var(--c-review);font-weight:700}
 .reader-bar .sp{flex:1}
@@ -81,7 +80,7 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .tbtn.hot{color:var(--c-review);border-color:#e6cfa3}
 .doc{animation:fade .22s ease}
 @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
-.doc :where(h1,h2,h3,h4){scroll-margin-top:24px}
+.doc :where(h1,h2,h3,h4){scroll-margin-top:64px}
 .doc h1{font-size:1.92rem;line-height:1.25;margin:.1em 0 .55em;letter-spacing:-.022em;font-weight:800}
 .doc h2{font-size:1.36rem;margin:2.05em 0 .65em;padding-bottom:.32em;
   border-bottom:1.5px solid var(--line);font-weight:700;letter-spacing:-.01em}
@@ -118,23 +117,31 @@ body{margin:0;background:var(--paper);color:var(--ink);
 .toc a.lvl3{padding-left:24px;font-size:.74rem}
 .toc a.active{color:var(--accent);border-left-color:var(--accent);font-weight:700}
 
-/* 편집 모드 */
-.editor{display:none;gap:22px}
+/* 편집 모드 (WYSIWYG + 소스 토글) */
+.editor{display:none;flex-direction:column;gap:12px}
 body.editing .editor{display:flex}
 body.editing article.doc{display:none}
-body.editing .reader{max-width:1200px}
+body.editing .reader{max-width:920px}
 body.editing .toc{display:none}
-.ed-src{flex:1 1 50%;min-width:0;min-height:72vh;border:1px solid var(--line);border-radius:10px;
-  padding:16px;font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
-  font-size:13.5px;line-height:1.62;background:#fffdf9;color:var(--ink);resize:vertical;tab-size:2}
+.edtoolbar{position:sticky;top:54px;z-index:6;display:none;flex-wrap:wrap;gap:3px;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:11px;padding:7px 9px;
+  box-shadow:0 3px 12px rgba(60,40,20,.06)}
+body.editing.wys .edtoolbar{display:flex}
+.edtoolbar button{border:1px solid transparent;background:none;border-radius:7px;padding:5px 10px;
+  font-size:.85rem;cursor:pointer;color:var(--ink);font-family:inherit;min-width:32px;line-height:1.1}
+.edtoolbar button:hover{background:var(--accent-soft);color:var(--accent)}
+.edtoolbar .div{width:1px;height:18px;background:var(--line);margin:0 4px}
+.ed-wys{display:none;min-height:72vh;border:1px solid var(--line);border-radius:12px;
+  padding:30px 36px;background:var(--card);outline:none;font-size:17px;line-height:1.78}
+body.editing.wys .ed-wys{display:block}
+.ed-wys:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ed-src{display:none;width:100%;min-height:74vh;border:1px solid var(--line);border-radius:12px;
+  padding:18px;font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  font-size:13.5px;line-height:1.65;background:#fffdf9;color:var(--ink);resize:vertical;tab-size:2}
+body.editing.src .ed-src{display:block}
 .ed-src:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.ed-prevwrap{flex:1 1 50%;min-width:0;display:flex;flex-direction:column}
-.ed-prevhint{font-size:.66rem;color:var(--muted);margin:0 0 6px 2px}
-.ed-prev{overflow:auto;border:1px solid var(--line-soft);border-radius:10px;
-  padding:6px 22px 18px;background:var(--card);min-height:72vh}
-.noprev{color:var(--muted);padding:40px 20px;text-align:center;line-height:1.7}
+.edhint{font-size:.69rem;color:var(--muted);margin:0 2px}
 
-/* 모바일 */
 .menu-toggle{display:none;position:fixed;top:12px;left:12px;z-index:60;
   background:var(--ink);color:#fff;border:none;border-radius:9px;padding:9px 13px;
   font-size:.85rem;font-family:inherit;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.22)}
@@ -151,11 +158,10 @@ body.editing .toc{display:none}
     transition:transform .25s ease;box-shadow:6px 0 24px rgba(40,28,18,.18)}
   .sidebar.open{transform:none}
   .content{padding:0 18px}
-  .reader{padding:60px 0 90px;font-size:16.5px}
-  .reader-bar{padding-top:4px}
+  .reader{padding:56px 0 90px;font-size:16.5px}
   .doc h1{font-size:1.62rem}.doc h2{font-size:1.24rem}
-  .editor{flex-direction:column}
-  .ed-src,.ed-prev{min-height:46vh}
+  .edtoolbar{top:50px}
+  .ed-wys{padding:22px 18px}
 }
 </style>
 </head>
@@ -183,11 +189,10 @@ body.editing .toc{display:none}
     <main class="reader" id="reader">
       <div class="reader-bar" id="readerbar"></div>
       <div class="editor" id="editor">
+        <div class="edtoolbar" id="edtoolbar"><button data-cmd="undo" title="실행취소">↶</button><button data-cmd="redo" title="다시실행">↷</button><span class="div"></span><button data-cmd="bold" title="굵게"><b>B</b></button><button data-cmd="italic" title="기울임"><i>I</i></button><button data-cmd="strikeThrough" title="취소선"><s>S</s></button><span class="div"></span><button data-cmd="h2" title="제목">제목</button><button data-cmd="h3" title="소제목">소제목</button><button data-cmd="p" title="본문">본문</button><span class="div"></span><button data-cmd="ul" title="글머리 목록">• 목록</button><button data-cmd="ol" title="번호 목록">1. 목록</button><button data-cmd="quote" title="인용">❝ 인용</button><button data-cmd="link" title="링크">🔗 링크</button></div>
+        <div class="ed-wys doc" id="edwys" contenteditable="true" spellcheck="false"></div>
         <textarea class="ed-src" id="edsrc" spellcheck="false"></textarea>
-        <div class="ed-prevwrap">
-          <p class="ed-prevhint">미리보기 (실제 배포본은 커밋 후 다시 빌드됩니다)</p>
-          <div class="ed-prev doc" id="edprev"></div>
-        </div>
+        <p class="edhint">✏️ 본문을 클릭해 바로 고치세요. 자동 저장(브라우저)됩니다. <b>💾 저장</b>으로 .md를 받거나 <b>📋 복사</b>해서 채팅에 붙여주시면 제가 커밋합니다.</p>
       </div>
       <article class="doc" id="doc-0" data-group="idx" data-status="confirmed" hidden>
 <h1 id="d0-헐버트-프로젝트--문서-지도-document-map">헐버트 프로젝트 — 문서 지도 (Document Map)</h1>
@@ -5565,6 +5570,8 @@ Here, every handmade piece is the work of an independent Korean artist — and b
 <script type="application/json" id="relpaths">{"0": "docs/문서-지도.md", "1": "README.md", "2": "docs/작가-소개.md", "3": "docs/브랜드-정의서.md", "4": "docs/홈페이지-사이트맵.md", "5": "docs/홈-랜딩-카피.md", "6": "docs/pages/소개.md", "7": "docs/pages/공간소개.md", "8": "docs/pages/작가들.md", "9": "docs/pages/소식.md", "10": "docs/pages/합류하기.md", "11": "docs/pages/문의.md", "12": "docs/작가-운영정책.md", "13": "docs/입점-동의서.md", "14": "docs/운영-매뉴얼.md", "15": "docs/작가-모집-키트.md", "16": "docs/사업계획서.md", "17": "docs/성과지표-KPI.md", "18": "docs/정관-거버넌스.md", "19": "docs/상표-IP-보호-메모.md", "20": "docs/헐버트작가촌-기획.md", "21": "docs/손님-매장안내.md", "22": "docs/en/hulbert-en.md", "23": "docs/legal/개인정보처리방침.md", "24": "docs/legal/이용약관.md", "25": "docs/legal/사업자정보.md"}</script>
 <script type="application/json" id="basemap">{"문서-지도": 0, "README": 1, "작가-소개": 2, "브랜드-정의서": 3, "홈페이지-사이트맵": 4, "홈-랜딩-카피": 5, "소개": 6, "공간소개": 7, "작가들": 8, "소식": 9, "합류하기": 10, "문의": 11, "작가-운영정책": 12, "입점-동의서": 13, "운영-매뉴얼": 14, "작가-모집-키트": 15, "사업계획서": 16, "성과지표-KPI": 17, "정관-거버넌스": 18, "상표-IP-보호-메모": 19, "헐버트작가촌-기획": 20, "손님-매장안내": 21, "hulbert-en": 22, "개인정보처리방침": 23, "이용약관": 24, "사업자정보": 25}</script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/turndown@7/dist/turndown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1/dist/turndown-plugin-gfm.js"></script>
 <script>
 const RAW =JSON.parse(document.getElementById('rawdata').textContent);
 const RELP=JSON.parse(document.getElementById('relpaths').textContent);
@@ -5581,20 +5588,30 @@ const tocEl=document.getElementById('toc');
 const sidebar=document.getElementById('sidebar');
 const scrim=document.getElementById('scrim');
 const bar=document.getElementById('readerbar');
-const editor=document.getElementById('editor');
+const edwys=document.getElementById('edwys');
 const edsrc=document.getElementById('edsrc');
-const edprev=document.getElementById('edprev');
+const edtoolbar=document.getElementById('edtoolbar');
 const total=items.length;
-let curStatus='all',curQuery='',curHeads=[],tocLinks=[],curDoc=0,editing=false;
+let curStatus='all',curQuery='',curHeads=[],tocLinks=[],curDoc=0,editing=false,mode='wysiwyg',dt;
+const touched=new Set();
+
+let TD=null;
+try{ if(window.TurndownService){
+  TD=new window.TurndownService({headingStyle:'atx',hr:'---',bulletListMarker:'-',
+    codeBlockStyle:'fenced',emDelimiter:'*',strongDelimiter:'**',linkStyle:'inlined'});
+  if(window.turndownPluginGfm) TD.use(window.turndownPluginGfm.gfm);
+}}catch(e){}
+const canWys=()=>!!(TD&&window.marked);
 
 const EKEY=i=>'hbedit:'+RELP[i];
 const getSrc=i=>{const v=localStorage.getItem(EKEY(i));return v!==null?v:RAW[i];};
-const isEdited=i=>{const v=localStorage.getItem(EKEY(i));return v!==null&&v!==RAW[i];};
+const isEdited=i=>localStorage.getItem(EKEY(i))!==null;
 function editedList(){const r=[];for(let k=0;k<total;k++)if(isEdited(k))r.push(k);return r;}
 function slug(t){return t.trim().toLowerCase().replace(/[^\w\s-]/g,'').replace(/\s+/g,'-');}
+function norm(s){return s.replace(/\r\n?/g,'\n').replace(/[ \t]+$/gm,'').replace(/\n{3,}/g,'\n\n').trim()+'\n';}
 
 function renderMD(src,i){
-  if(!window.marked) return '<div class="noprev">미리보기 모듈(marked)을 불러오지 못했어요 — 네트워크 차단 등.<br>소스 편집과 <b>.md 저장</b>은 정상 작동합니다.</div>';
+  if(!window.marked) return '<div class="edhint" style="padding:30px;text-align:center">미리보기 모듈을 불러오지 못했습니다.</div>';
   const div=document.createElement('div');
   div.innerHTML=window.marked.parse(src);
   div.querySelectorAll('h1,h2,h3,h4').forEach(h=>{if(!h.id)h.id='d'+i+'-'+slug(h.textContent);});
@@ -5607,6 +5624,26 @@ function renderMD(src,i){
 function renderReadDoc(i){
   const art=document.getElementById('doc-'+i);
   art.innerHTML=(isEdited(i)&&window.marked)?renderMD(getSrc(i),i):ORIG[i];
+}
+
+const _base={};
+function baseMD(i){ if(_base[i]===undefined){ _base[i]= canWys()? norm(TD.turndown(window.marked.parse(RAW[i]))) : RAW[i]; } return _base[i]; }
+function currentMarkdown(){
+  if(editing&&mode==='wysiwyg'&&TD) return norm(TD.turndown(edwys.innerHTML));
+  return edsrc.value;
+}
+function persist(){
+  if(!touched.has(curDoc))return;
+  const md=currentMarkdown();
+  const baseline=(mode==='wysiwyg')?baseMD(curDoc):RAW[curDoc];
+  if(md===baseline) localStorage.removeItem(EKEY(curDoc)); else localStorage.setItem(EKEY(curDoc),md);
+  markSidebar();
+}
+function flush(){ clearTimeout(dt); persist(); }
+function schedule(){ clearTimeout(dt); dt=setTimeout(()=>{persist();updateBar();},300); }
+function loadIntoEditor(i){
+  if(mode==='wysiwyg'&&canWys()) edwys.innerHTML=window.marked.parse(getSrc(i));
+  else edsrc.value=getSrc(i);
 }
 
 function applyFilter(){
@@ -5636,6 +5673,7 @@ function spy(){
   tocLinks.forEach((a,k)=>a.classList.toggle('active',k===idx));
 }
 function markSidebar(){items.forEach(c=>c.classList.toggle('edited',isEdited(+c.dataset.i)));}
+function setModeClass(){document.body.classList.toggle('wys',mode==='wysiwyg');document.body.classList.toggle('src',mode==='source');}
 
 function updateBar(){
   const i=curDoc,ed=isEdited(i),nE=editedList().length;
@@ -5645,8 +5683,9 @@ function updateBar(){
   if(!editing){
     h+='<button class="tbtn primary" data-act="edit">✏️ 편집</button>';
   }else{
-    h+='<button class="tbtn primary" data-act="read">✓ 읽기로</button>';
-    h+='<button class="tbtn" data-act="save">💾 .md 저장</button>';
+    h+='<button class="tbtn primary" data-act="read">✓ 완료</button>';
+    if(canWys())h+='<button class="tbtn" data-act="mode">'+(mode==='wysiwyg'?'&lt;/&gt; 소스':'👁 비주얼')+'</button>';
+    h+='<button class="tbtn" data-act="save">💾 저장</button>';
     h+='<button class="tbtn" data-act="copy">📋 복사</button>';
     if(ed)h+='<button class="tbtn hot" data-act="revert">↩︎ 원본</button>';
   }
@@ -5654,67 +5693,101 @@ function updateBar(){
   bar.innerHTML=h;
 }
 
-function enterEdit(){editing=true;document.body.classList.add('editing');
-  edsrc.value=getSrc(curDoc);edprev.innerHTML=renderMD(edsrc.value,curDoc);updateBar();window.scrollTo({top:0});edsrc.focus();}
-function exitEdit(){editing=false;document.body.classList.remove('editing');
-  renderReadDoc(curDoc);markSidebar();buildTOC(document.getElementById('doc-'+curDoc));updateBar();
-  window.scrollTo({top:0});requestAnimationFrame(spy);}
-
-let dt;
-edsrc.addEventListener('input',()=>{
-  const val=edsrc.value;
-  if(val===RAW[curDoc])localStorage.removeItem(EKEY(curDoc));else localStorage.setItem(EKEY(curDoc),val);
-  clearTimeout(dt);dt=setTimeout(()=>{edprev.innerHTML=renderMD(val,curDoc);markSidebar();updateBar();},170);
-});
-// 탭 입력 지원
-edsrc.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();
-  const s=edsrc.selectionStart,en=edsrc.selectionEnd;edsrc.value=edsrc.value.slice(0,s)+'  '+edsrc.value.slice(en);
-  edsrc.selectionStart=edsrc.selectionEnd=s+2;edsrc.dispatchEvent(new Event('input'));}});
+function enterEdit(){
+  editing=true; mode=canWys()?'wysiwyg':'source';
+  document.body.classList.add('editing'); setModeClass();
+  loadIntoEditor(curDoc); updateBar(); window.scrollTo({top:0});
+  if(!canWys()) toast('편집 모듈을 불러오는 중이거나 차단됨 — 소스 모드로 편집합니다');
+  (mode==='wysiwyg'?edwys:edsrc).focus();
+}
+function exitEdit(){
+  flush(); editing=false;
+  document.body.classList.remove('editing','wys','src');
+  renderReadDoc(curDoc); markSidebar();
+  buildTOC(document.getElementById('doc-'+curDoc)); updateBar();
+  window.scrollTo({top:0}); requestAnimationFrame(spy);
+}
+function toggleMode(){
+  if(mode==='wysiwyg'){ edsrc.value=currentMarkdown(); mode='source'; }
+  else { if(!canWys()){toast('비주얼 편집은 인터넷 연결이 필요해요');return;} edwys.innerHTML=window.marked.parse(edsrc.value); mode='wysiwyg'; }
+  setModeClass(); updateBar(); (mode==='wysiwyg'?edwys:edsrc).focus();
+}
 
 function downloadDoc(i){
+  if(i===curDoc&&editing)flush();
   const blob=new Blob([getSrc(i)],{type:'text/markdown;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=RELP[i].split('/').pop();document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
 function copyDoc(i){
+  if(i===curDoc&&editing)flush();
   const t=getSrc(i);
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>toast('마크다운을 클립보드에 복사했어요')).catch(()=>toast('복사 실패 — 소스를 직접 선택해 주세요'));}
-  else{edsrc.select();document.execCommand&&document.execCommand('copy');toast('복사했어요');}
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(t).then(()=>toast('마크다운을 클립보드에 복사했어요')).catch(()=>toast('복사 실패 — 소스 모드에서 직접 선택해 주세요'));
+  else toast('이 브라우저에선 자동 복사가 안 돼요 — 소스 모드에서 직접 선택');
 }
 function revertDoc(i){
-  if(!confirm('이 문서의 로컬 편집을 모두 버리고 원본으로 되돌릴까요?'))return;
-  localStorage.removeItem(EKEY(i));
-  if(editing&&i===curDoc){edsrc.value=RAW[i];edprev.innerHTML=renderMD(RAW[i],i);}
-  renderReadDoc(i);markSidebar();updateBar();toast('원본으로 되돌렸어요');
+  if(!confirm('이 문서의 편집을 모두 버리고 원본으로 되돌릴까요?'))return;
+  localStorage.removeItem(EKEY(i)); touched.delete(i);
+  if(editing&&i===curDoc) loadIntoEditor(i);
+  renderReadDoc(i); markSidebar(); updateBar(); toast('원본으로 되돌렸어요');
 }
 
 function selectDoc(i){
-  curDoc=+i;
+  i=+i;
+  if(editing){
+    flush(); curDoc=i;
+    articles.forEach(d=>d.hidden=(d.id!=='doc-'+i));
+    items.forEach(c=>c.classList.toggle('active',c.dataset.i===String(i)));
+    loadIntoEditor(i); updateBar(); closeSidebar(); window.scrollTo({top:0});
+    (mode==='wysiwyg'?edwys:edsrc).focus(); return;
+  }
+  curDoc=i;
   articles.forEach(d=>d.hidden=(d.id!=='doc-'+i));
   items.forEach(c=>c.classList.toggle('active',c.dataset.i===String(i)));
-  closeSidebar();
-  if(editing){edsrc.value=getSrc(i);edprev.innerHTML=renderMD(edsrc.value,i);updateBar();window.scrollTo({top:0});return;}
-  renderReadDoc(i);
+  closeSidebar(); renderReadDoc(i);
   buildTOC(document.getElementById('doc-'+i));
-  updateBar();window.scrollTo({top:0,behavior:'auto'});requestAnimationFrame(spy);
+  updateBar(); window.scrollTo({top:0,behavior:'auto'}); requestAnimationFrame(spy);
 }
 
 function openSidebar(){sidebar.classList.add('open');scrim.classList.add('show');}
 function closeSidebar(){sidebar.classList.remove('open');scrim.classList.remove('show');}
 let tt;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),1900);}
 
+edwys.addEventListener('input',()=>{touched.add(curDoc);schedule();});
+edsrc.addEventListener('input',()=>{touched.add(curDoc);schedule();});
+edsrc.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();
+  const s=edsrc.selectionStart,en=edsrc.selectionEnd;edsrc.value=edsrc.value.slice(0,s)+'  '+edsrc.value.slice(en);
+  edsrc.selectionStart=edsrc.selectionEnd=s+2;touched.add(curDoc);schedule();}});
+edtoolbar.addEventListener('mousedown',e=>{
+  const b=e.target.closest('button[data-cmd]');if(!b)return;e.preventDefault();
+  edwys.focus();const c=b.dataset.cmd;
+  try{
+    if(c==='h2')document.execCommand('formatBlock',false,'H2');
+    else if(c==='h3')document.execCommand('formatBlock',false,'H3');
+    else if(c==='p')document.execCommand('formatBlock',false,'P');
+    else if(c==='quote')document.execCommand('formatBlock',false,'BLOCKQUOTE');
+    else if(c==='ul')document.execCommand('insertUnorderedList');
+    else if(c==='ol')document.execCommand('insertOrderedList');
+    else if(c==='link'){const u=prompt('링크 주소 (URL 또는 파일명.md):');if(u)document.execCommand('createLink',false,u);}
+    else document.execCommand(c,false,null);
+  }catch(_){}
+  touched.add(curDoc);schedule();
+});
+
 items.forEach(c=>c.addEventListener('click',()=>selectDoc(c.dataset.i)));
 stPills.forEach(p=>p.addEventListener('click',()=>{curStatus=p.dataset.st;stPills.forEach(x=>x.classList.toggle('active',x===p));applyFilter();}));
 search.addEventListener('input',()=>{curQuery=search.value.trim().toLowerCase();applyFilter();});
 bar.addEventListener('click',e=>{const b=e.target.closest('button[data-act]');if(!b)return;const a=b.dataset.act;
-  if(a==='edit')enterEdit();else if(a==='read')exitEdit();else if(a==='save')downloadDoc(curDoc);
-  else if(a==='copy')copyDoc(curDoc);else if(a==='revert')revertDoc(curDoc);
+  if(a==='edit')enterEdit();else if(a==='read')exitEdit();else if(a==='mode')toggleMode();
+  else if(a==='save')downloadDoc(curDoc);else if(a==='copy')copyDoc(curDoc);else if(a==='revert')revertDoc(curDoc);
   else if(a==='saveall'){const L=editedList();if(!L.length){toast('변경된 문서가 없어요');return;}L.forEach((x,k)=>setTimeout(()=>downloadDoc(x),k*250));toast(L.length+'개 문서를 내려받아요');}});
-document.addEventListener('click',e=>{const a=e.target.closest('a[data-goto]');if(a){e.preventDefault();selectDoc(a.dataset.goto);}});
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-goto]');if(a&&!editing){e.preventDefault();selectDoc(a.dataset.goto);}});
 document.getElementById('menu').addEventListener('click',openSidebar);
 scrim.addEventListener('click',closeSidebar);
 window.addEventListener('scroll',spy,{passive:true});
+window.addEventListener('beforeunload',e=>{if(editing){flush();}});
 
 markSidebar();applyFilter();selectDoc(0);
 </script>
