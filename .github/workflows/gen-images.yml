@@ -1,0 +1,68 @@
+name: 문서 이미지 생성 (OpenAI)
+
+# 수동 실행 전용: GitHub → Actions 탭 → 이 워크플로 → "Run workflow"
+# 사전 준비(1회): Settings → Secrets and variables → Actions →
+#   New repository secret → 이름 OPENAI_API_KEY, 값 = 본인 OpenAI 키
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "이미 있는 이미지도 다시 생성"
+        type: boolean
+        default: false
+      quality:
+        description: "이미지 품질 (low/medium/high)"
+        type: string
+        default: "low"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gen-images
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install deps
+        run: pip install markdown
+
+      - name: Generate images
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_IMAGE_QUALITY: ${{ inputs.quality }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY 시크릿이 없습니다. Settings → Secrets and variables → Actions 에서 추가하세요."
+            exit 1
+          fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            python tools/gen_images.py --force
+          else
+            python tools/gen_images.py
+          fi
+
+      - name: Rebuild viewer
+        run: python viewer/build.py
+
+      - name: Commit & push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add viewer/assets viewer/index.html
+          if git diff --cached --quiet; then
+            echo "변경 사항 없음 — 커밋 생략"
+          else
+            git commit -m "문서 이해용 이미지 생성/갱신 (자동)"
+            git push
+          fi
