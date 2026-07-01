@@ -4,12 +4,19 @@
 좁히고, 문서 버튼을 누르면 내용이 바로 펼쳐집니다. 외부 라이브러리 없이 **혼자서 열립니다**.
 
 ## 여는 법
-`viewer/index.html`을 브라우저로 그냥 더블클릭해서 열면 됩니다. (인터넷 연결 불필요)
+`viewer/index.html`을 브라우저로 그냥 더블클릭해서 열면 됩니다. (읽기는 인터넷 연결 불필요)
+
+## 빠르게 뜨는 구조 (성능)
+- **읽기 화면은 `index.html` 하나로 즉시 표시** — 미리 렌더된 HTML만 쓰고, 외부 스크립트를 기다리지 않습니다.
+- **원문 마크다운은 `sources.json`으로 분리** — 편집·복사·저장을 누르는 순간에만 내려받아 초기 전송량을 절반 수준으로 줄였습니다.
+- **편집 모듈(marked·turndown)도 편집 진입 시에만 CDN에서 로드** — 읽기만 하는 방문자는 아무것도 추가로 받지 않습니다.
+- 웹폰트는 비차단 로드, 첫 문서 일러스트는 우선 로드(`fetchpriority`), 나머지는 지연 로드입니다.
+- 참고: `file://`로 더블클릭해 열면 브라우저 보안 정책상 `sources.json`을 못 읽어 **편집·복사·저장만** 제한될 수 있습니다(읽기는 정상). 이 기능까지 쓰려면 배포된 주소나 `python3 -m http.server`로 여세요.
 
 ## 다시 만드는 법 (문서가 바뀌었을 때)
 ```bash
 pip install markdown      # 최초 1회
-python3 viewer/build.py   # docs/ 전체를 다시 읽어 index.html 갱신
+python3 viewer/build.py   # docs/ 전체를 다시 읽어 index.html + sources.json 갱신
 ```
 
 새 문서를 추가했다면 `viewer/build.py`의 `DOCS` 목록에 한 줄(경로·그룹)만 더해 주세요.

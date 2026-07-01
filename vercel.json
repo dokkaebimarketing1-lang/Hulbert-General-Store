@@ -1,5 +1,7 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/viewer/index.html" }
+    { "source": "/", "destination": "/viewer/index.html" },
+    { "source": "/sources.json", "destination": "/viewer/sources.json" },
+    { "source": "/assets/:path*", "destination": "/viewer/assets/:path*" }
   ]
 }
