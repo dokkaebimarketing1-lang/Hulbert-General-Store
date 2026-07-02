@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""헐버트 프로젝트 문서 → 단일 HTML 뷰어+WYSIWYG 편집기 빌드.
-읽기=외부 의존성 없음(미리 렌더된 HTML). 편집=marked(렌더)+turndown(역변환) CDN, 차단 시 소스 모드 폴백."""
+"""헐버트 프로젝트 문서 → HTML 뷰어+WYSIWYG 편집기 빌드.
+읽기=외부 의존성 없음(미리 렌더된 HTML, index.html 단독으로 즉시 표시).
+편집=원문(sources.json)과 marked(렌더)+turndown(역변환) CDN을 편집 시점에만 지연 로드.
+로드 실패 시 소스 모드/안내 토스트로 폴백 — 읽기는 어떤 경우에도 막히지 않는다."""
 import re, os, json, html as htmllib
 import markdown
 
@@ -25,6 +27,7 @@ DOCS = [
     ("docs/입점-동의서.md",       "C", "운영·계약"),
     ("docs/운영-매뉴얼.md",       "C", "운영·계약"),
     ("docs/작가-모집-키트.md",    "D", "모집"),
+    ("docs/로드맵.md",           "E", "경영·관리"),
     ("docs/사업계획서.md",        "E", "경영·관리"),
     ("docs/성과지표-KPI.md",      "E", "경영·관리"),
     ("docs/정관-거버넌스.md",     "E", "경영·관리"),
@@ -113,10 +116,14 @@ for i, (rel, gkey, glabel) in enumerate(DOCS):
     slug = os.path.basename(rel)[:-3] if rel.endswith(".md") else os.path.basename(rel)
     for ext in ("png", "svg"):
         if os.path.exists(os.path.join(ROOT, "viewer", "assets", slug + "." + ext)):
-            body = f'<img class="doc-hero" src="assets/{slug}.{ext}" alt="" loading="lazy">\n' + body
+            # 첫 문서 히어로는 첫 화면(LCP)이므로 즉시·우선 로드, 나머지는 지연 로드
+            img_attr = 'fetchpriority="high"' if i == 0 else 'loading="lazy"'
+            body = f'<img class="doc-hero" src="assets/{slug}.{ext}" alt="" {img_attr}>\n' + body
             break
+    # 첫 문서는 JS 실행 전에도 보이도록 hidden 없이 출력(빈 화면 방지)
+    hidden_attr = "" if i == 0 else " hidden"
     articles.append(
-        f'<article class="doc" id="doc-{i}" data-group="{gkey}" data-status="{skey}" hidden>\n{body}\n</article>'
+        f'<article class="doc" id="doc-{i}" data-group="{gkey}" data-status="{skey}"{hidden_attr}>\n{body}\n</article>'
     )
     navmeta.append({"i": i, "title": title, "badge": badge or "—", "role": role,
                     "group": gkey, "glabel": glabel, "status": skey})
@@ -149,7 +156,9 @@ status_pills = "".join(
     for k, lbl in STATUS_ORDER
 )
 
-raw_json  = json.dumps({str(i): s for i, s in enumerate(raw_sources)}, ensure_ascii=False).replace("</", "<\\/")
+# 원문 마크다운은 index.html에 내장하지 않고 별도 파일(sources.json)로 분리 —
+# 초기 전송량을 절반 수준으로 줄이고, 편집·복사·저장 시점에만 fetch 한다.
+raw_json  = json.dumps({str(i): s for i, s in enumerate(raw_sources)}, ensure_ascii=False)
 relp_json = json.dumps({str(i): rel for i, (rel, _g, _gl) in enumerate(DOCS)}, ensure_ascii=False)
 base_json = json.dumps(basemap, ensure_ascii=False)
 
@@ -171,8 +180,9 @@ TOOLBAR = (
     '<button data-cmd="link" title="링크">🔗 링크</button>'
 )
 
+FONT_CSS = "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+
 CSS = """
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 :root{
   --paper:#ece4d5; --sidebar:#f6f1e7; --card:#fffdf9; --ink:#262220; --muted:#7c7264;
   --line:#e3dac9; --line-soft:#efe7d8; --accent:#9c5b34; --accent-soft:#f3e6dc; --accent2:#2f6b63;
@@ -335,7 +345,6 @@ body.editing.src .ed-src{display:block}
 """
 
 JS = """
-const RAW =JSON.parse(document.getElementById('rawdata').textContent);
 const RELP=JSON.parse(document.getElementById('relpaths').textContent);
 const BASE=JSON.parse(document.getElementById('basemap').textContent);
 const articles=Array.from(document.querySelectorAll('article.doc'));
@@ -357,16 +366,35 @@ const total=items.length;
 let curStatus='all',curQuery='',curHeads=[],tocLinks=[],curDoc=0,editing=false,mode='wysiwyg',dt;
 const touched=new Set();
 
-let TD=null;
-try{ if(window.TurndownService){
-  TD=new window.TurndownService({headingStyle:'atx',hr:'---',bulletListMarker:'-',
-    codeBlockStyle:'fenced',emDelimiter:'*',strongDelimiter:'**',linkStyle:'inlined'});
-  if(window.turndownPluginGfm) TD.use(window.turndownPluginGfm.gfm);
-}}catch(e){}
+/* 지연 로딩 — 원문(sources.json)·편집 모듈(CDN)은 편집/복사/저장 시점에만 가져온다.
+   초기 화면은 미리 렌더된 HTML만으로 그려져 네트워크 상태와 무관하게 즉시 뜬다. */
+let RAW=null,rawP=null;
+function ensureRAW(){
+  if(RAW)return Promise.resolve(RAW);
+  if(!rawP)rawP=fetch('sources.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+    .then(j=>(RAW=j)).catch(err=>{rawP=null;throw err;});
+  return rawP;
+}
+let TD=null,libsP=null;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');
+  s.src=src;s.onload=res;s.onerror=()=>rej(new Error(src));document.head.appendChild(s);});}
+function ensureLibs(){
+  if(!libsP)libsP=Promise.all([
+    loadScript('https://cdn.jsdelivr.net/npm/marked@12/marked.min.js').catch(()=>{}),
+    loadScript('https://cdn.jsdelivr.net/npm/turndown@7/dist/turndown.js')
+      .then(()=>loadScript('https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1/dist/turndown-plugin-gfm.js'))
+      .catch(()=>{})
+  ]).then(()=>{try{ if(window.TurndownService){
+    TD=new window.TurndownService({headingStyle:'atx',hr:'---',bulletListMarker:'-',
+      codeBlockStyle:'fenced',emDelimiter:'*',strongDelimiter:'**',linkStyle:'inlined'});
+    if(window.turndownPluginGfm) TD.use(window.turndownPluginGfm.gfm);
+  }}catch(e){}});
+  return libsP;
+}
 const canWys=()=>!!(TD&&window.marked);
 
 const EKEY=i=>'hbedit:'+RELP[i];
-const getSrc=i=>{const v=localStorage.getItem(EKEY(i));return v!==null?v:RAW[i];};
+const getSrc=i=>{const v=localStorage.getItem(EKEY(i));return v!==null?v:(RAW?RAW[i]:'');};
 const isEdited=i=>localStorage.getItem(EKEY(i))!==null;
 function editedList(){const r=[];for(let k=0;k<total;k++)if(isEdited(k))r.push(k);return r;}
 function slug(t){return t.trim().toLowerCase().replace(/[^\\w\\s-]/g,'').replace(/\\s+/g,'-');}
@@ -385,11 +413,22 @@ function renderMD(src,i){
 }
 function renderReadDoc(i){
   const art=document.getElementById('doc-'+i);
-  art.innerHTML=(isEdited(i)&&window.marked)?renderMD(getSrc(i),i):ORIG[i];
+  if(isEdited(i)){
+    if(window.marked){art.innerHTML=renderMD(getSrc(i),i);return;}
+    ensureLibs().then(()=>{ if(window.marked&&isEdited(i)&&!editing){
+      art.innerHTML=renderMD(getSrc(i),i);
+      if(i===curDoc){buildTOC(art);spy();}
+    }});
+  }
+  art.innerHTML=ORIG[i];
 }
 
 const _base={};
-function baseMD(i){ if(_base[i]===undefined){ _base[i]= canWys()? norm(TD.turndown(window.marked.parse(RAW[i]))) : RAW[i]; } return _base[i]; }
+function baseMD(i){
+  if(!RAW)return null;
+  if(_base[i]===undefined) _base[i]= canWys()? norm(TD.turndown(window.marked.parse(RAW[i]))) : RAW[i];
+  return _base[i];
+}
 function currentMarkdown(){
   if(editing&&mode==='wysiwyg'&&TD) return norm(TD.turndown(edwys.innerHTML));
   return edsrc.value;
@@ -397,8 +436,8 @@ function currentMarkdown(){
 function persist(){
   if(!touched.has(curDoc))return;
   const md=currentMarkdown();
-  const baseline=(mode==='wysiwyg')?baseMD(curDoc):RAW[curDoc];
-  if(md===baseline) localStorage.removeItem(EKEY(curDoc)); else localStorage.setItem(EKEY(curDoc),md);
+  const baseline=(mode==='wysiwyg')?baseMD(curDoc):(RAW?RAW[curDoc]:null);
+  if(baseline!==null&&md===baseline) localStorage.removeItem(EKEY(curDoc)); else localStorage.setItem(EKEY(curDoc),md);
   markSidebar();
 }
 function flush(){ clearTimeout(dt); persist(); }
@@ -455,12 +494,21 @@ function updateBar(){
   bar.innerHTML=h;
 }
 
+let entering=false;
 function enterEdit(){
-  editing=true; mode=canWys()?'wysiwyg':'source';
-  document.body.classList.add('editing'); setModeClass();
-  loadIntoEditor(curDoc); updateBar(); window.scrollTo({top:0});
-  if(!canWys()) toast('편집 모듈을 불러오는 중이거나 차단됨 — 소스 모드로 편집합니다');
-  (mode==='wysiwyg'?edwys:edsrc).focus();
+  if(editing||entering)return;
+  entering=true;
+  Promise.allSettled([ensureLibs(),ensureRAW()]).then(rs=>{
+    entering=false;
+    if(rs[1].status==='rejected'&&!isEdited(curDoc)){
+      toast('원본 문서를 불러오지 못했어요 — 네트워크 확인 후 다시 시도해 주세요');return;
+    }
+    editing=true; mode=canWys()?'wysiwyg':'source';
+    document.body.classList.add('editing'); setModeClass();
+    loadIntoEditor(curDoc); updateBar(); window.scrollTo({top:0});
+    if(!canWys()) toast('편집 모듈을 불러오지 못했어요 — 소스 모드로 편집합니다');
+    (mode==='wysiwyg'?edwys:edsrc).focus();
+  });
 }
 function exitEdit(){
   flush(); editing=false;
@@ -475,19 +523,27 @@ function toggleMode(){
   setModeClass(); updateBar(); (mode==='wysiwyg'?edwys:edsrc).focus();
 }
 
+function withSrc(i,fn){
+  if(RAW||isEdited(i)){fn();return;}
+  ensureRAW().then(fn).catch(()=>toast('원본 문서를 불러오지 못했어요 — 네트워크를 확인해 주세요'));
+}
 function downloadDoc(i){
-  if(i===curDoc&&editing)flush();
-  const blob=new Blob([getSrc(i)],{type:'text/markdown;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=RELP[i].split('/').pop();document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  withSrc(i,()=>{
+    if(i===curDoc&&editing)flush();
+    const blob=new Blob([getSrc(i)],{type:'text/markdown;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=RELP[i].split('/').pop();document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  });
 }
 function copyDoc(i){
-  if(i===curDoc&&editing)flush();
-  const t=getSrc(i);
-  if(navigator.clipboard&&navigator.clipboard.writeText)
-    navigator.clipboard.writeText(t).then(()=>toast('마크다운을 클립보드에 복사했어요')).catch(()=>toast('복사 실패 — 소스 모드에서 직접 선택해 주세요'));
-  else toast('이 브라우저에선 자동 복사가 안 돼요 — 소스 모드에서 직접 선택');
+  withSrc(i,()=>{
+    if(i===curDoc&&editing)flush();
+    const t=getSrc(i);
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(t).then(()=>toast('마크다운을 클립보드에 복사했어요')).catch(()=>toast('복사 실패 — 소스 모드에서 직접 선택해 주세요'));
+    else toast('이 브라우저에선 자동 복사가 안 돼요 — 소스 모드에서 직접 선택');
+  });
 }
 function revertDoc(i){
   if(!confirm('이 문서의 편집을 모두 버리고 원본으로 되돌릴까요?'))return;
@@ -545,10 +601,12 @@ bar.addEventListener('click',e=>{const b=e.target.closest('button[data-act]');if
   if(a==='edit')enterEdit();else if(a==='read')exitEdit();else if(a==='mode')toggleMode();
   else if(a==='save')downloadDoc(curDoc);else if(a==='copy')copyDoc(curDoc);else if(a==='revert')revertDoc(curDoc);
   else if(a==='saveall'){const L=editedList();if(!L.length){toast('변경된 문서가 없어요');return;}L.forEach((x,k)=>setTimeout(()=>downloadDoc(x),k*250));toast(L.length+'개 문서를 내려받아요');}});
+bar.addEventListener('pointerover',e=>{if(e.target.closest('button[data-act="edit"]')){ensureLibs();ensureRAW().catch(()=>{});}});
 document.addEventListener('click',e=>{const a=e.target.closest('a[data-goto]');if(a&&!editing){e.preventDefault();selectDoc(a.dataset.goto);}});
 document.getElementById('menu').addEventListener('click',openSidebar);
 scrim.addEventListener('click',closeSidebar);
-window.addEventListener('scroll',spy,{passive:true});
+let spyQ=false;
+window.addEventListener('scroll',()=>{if(spyQ)return;spyQ=true;requestAnimationFrame(()=>{spyQ=false;spy();});},{passive:true});
 window.addEventListener('beforeunload',e=>{if(editing){flush();}});
 
 markSidebar();applyFilter();selectDoc(0);
@@ -560,6 +618,10 @@ HTML = f"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>헐버트 프로젝트 · 문서</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="{FONT_CSS}" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="{FONT_CSS}"></noscript>
 <style>{CSS}</style>
 </head>
 <body>
@@ -598,20 +660,23 @@ HTML = f"""<!DOCTYPE html>
 </div>
 <div class="toast" id="toast"></div>
 
-<script type="application/json" id="rawdata">{raw_json}</script>
 <script type="application/json" id="relpaths">{relp_json}</script>
 <script type="application/json" id="basemap">{base_json}</script>
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/turndown@7/dist/turndown.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1/dist/turndown-plugin-gfm.js"></script>
 <script>{JS}</script>
 </body>
 </html>
 """
 
+SRC_OUT = os.path.join(ROOT, "viewer", "sources.json")
+
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", encoding="utf-8") as f:
     f.write(HTML)
+with open(SRC_OUT, "w", encoding="utf-8") as f:
+    f.write(raw_json)
 
 print("WROTE", OUT)
-print("docs:", len(DOCS), "| size:", round(len(HTML)/1024, 1), "KB")
+print("WROTE", SRC_OUT)
+print("docs:", len(DOCS),
+      "| index.html:", round(len(HTML)/1024, 1), "KB",
+      "| sources.json:", round(len(raw_json)/1024, 1), "KB")
