@@ -10,14 +10,14 @@
 
 ---
 
-## 🌐 라이브 문서 뷰어
+## 🌐 라이브
 
-👉 **https://dokkaebimarketing1-lang.github.io/Hulbert-General-Store/**
+- 👉 **헐버트작가촌 모집 사이트**: **https://dokkaebimarketing1-lang.github.io/Hulbert-General-Store/** — 예비 작가가 보는 공개 사이트 (홈·소개·공간·운영정책·합류 등 8페이지). 소스 [`site/`](site/), 사양 [`docs/기술-사양.md`](docs/기술-사양.md).
+- 👉 **문서 뷰어(내부용)**: **https://dokkaebimarketing1-lang.github.io/Hulbert-General-Store/viewer/** — 아래 모든 기획 문서를 한 페이지에서 열람·편집. 소스 [`viewer/`](viewer/).
 
-아래 모든 문서를 **한 페이지에서** 봅니다 — 상단 **필터(그룹·상태·검색)** 와 문서 버튼을 누르면 내용이 바로 펼쳐집니다. `main`에 푸시하면 **자동으로 다시 배포**됩니다.
-(뷰어 소스 [`viewer/`](viewer/) · 문서 수정 후 재생성: `python3 viewer/build.py`)
+`main`에 푸시하면 CI가 **자동으로 빌드·재배포**합니다(수동 재생성 불필요). 로컬 미리보기: `pip install -r requirements.txt && python3 viewer/build.py && python3 site/build_site.py` → `_site/`.
 
-> ⚠️ **공개 링크**입니다 — 누구나(검색 포함) 열람할 수 있습니다. 비공개가 필요하면 저장소를 비공개로 전환하거나 암호보호 호스팅으로 옮길 수 있습니다.
+> ⚠️ 둘 다 **공개 링크**입니다 — 누구나 열람할 수 있습니다(뷰어는 검색엔진 제외 처리). 비공개가 필요하면 저장소를 비공개로 전환하거나 암호보호 호스팅으로 옮길 수 있습니다.
 
 ---
 
